@@ -1,13 +1,20 @@
 const Net = require('net');
+const { damage } = require('./vts_modules/vtsConnector');
 const emuPort = 34000;
 const vtsConnection = require('./vts_modules/vtsConnector');
 
 var gameState = {
-    "power": 0,
-    "star": false,
-    "jump": false,
-    "swim": false
+    "timer": 0,
+    "speed": 0,
+    "turn": 0,
+    "power": 2048,
+    "death": false,
+    "damage": false,
+    "raceActive": false
 }
+
+const normalTurnLimit = 14;
+const maxTurnLimit = 16;
 
 const server = Net.createServer();
 server.listen(emuPort, function() {
@@ -43,69 +50,59 @@ function processChunk(chunk) {
         console.log("ERROR combined packet recieved: " + chunk);
         return;
     }
-    
-    let value = data.value;
-    /* 
-        TODO:
-        separate this into two pieces - one to update state, then one to evaluate what should be done based on total overall state
-        with the current semi-stateless method of updating based on last change, it's hard to account for which things should override each other without messy piecemeal stuff
-    */
-    switch (data.type) {
-        case "power":
-            if (gameState.power != value) {
-                gameState.power = value;
-                //TODO: temporary - see comment at top of switch
-                if (gameState.death == true) return;
-                console.log("Mario powerup " + value + ": send MoveModelRequest and ColorTintRequest");
-                vtsConnection.powerup(value);
-            }
-            break;
-        case "star":
-            if (gameState.star != value) {
-                gameState.star = value;
-                console.log("Star status " + value + ": send ColorTintRequest")
-                vtsConnection.star(value);
-                if (value == false) {
-                    vtsConnection.powerup(gameState.power);
-                }
-            }
-            break;
-        case "jump":
-            if (gameState.jump != value) {
-                gameState.jump = value;
-                //TODO: temporary - see comment at top of switch
-                if (gameState.death == true) return;
-                console.log("Jump status " + value + ": send MoveModelRequest")
-                vtsConnection.jump(value, gameState.power);
-            }
-            break;
-        case "swim":
-            if (gameState.swim != value) {
-                gameState.swim = value;
-                console.log("Swim mode " + value + ": send ColorTintRequest")
-                if (value == true) {
-                    vtsConnection.swim();
-                }
-                else {
-                    vtsConnection.powerup(gameState.power);
-                }
-            }
-            break;
-        case "death":
-            if (gameState.death != value) {
-                gameState.death = value;
-                console.log("Death state " + value + ": send MoveModelRequest")
-                if (value == true) {
-                    vtsConnection.death();
-                }
-                else {
-                    gameState.power = 0;
-                    vtsConnection.powerup(gameState.power);
-                }
-            }
-            break;
-        default:
-            break;
-    }
+
+    executeData(data)
 }
 
+var akari = new vtsConnection.Avatar();
+
+function executeData(data) {
+    data.turn = convertTurnValue(data.turn);
+    data.damage = false;
+    if (data.power < gameState.power) {
+        data.damage = true;
+    }
+
+    // determine whether race is active
+    if (data.timer != gameState.timer) {
+        gameState.raceActive = false;
+        gameState = data;
+        return;
+    }
+    else {
+        gameState.raceActive = true;
+    }
+
+    // determine whether the vehicle's taken damage
+    if (data.damage != gameState.damage) {
+        console.log("switchDamage " + data.damage);
+        akari.shock(data.damage);
+    }
+    
+    // determine whether power is below half
+    if (akari.crying == false && power < 1024) {
+        akari.cry(true);
+    } else if (akari.crying == true && power >= 1024) {
+        akari.cry(false);
+    }
+
+    //depends on whether the race is over
+    if (data.state == 0b01000000 || data.state == 0b01000000 || data.state == 0b11000000) {
+        akari.defeated();
+    }
+
+    gameState = data;
+}
+
+function convertTurnValue(turnValue) {   
+    let turnPercent;
+    if (turnValue == 0) {
+        turnPercent = 0;
+    } else {
+        let sign = Math.sign(turnValue);
+        let absValue = Math.abs(turnValue);
+        let turnPercent = absValue / normalTurnLimit;
+        if (sign < 1) turnPercent = -(turnPercent);
+    }
+    return turnPercent;
+}

@@ -35,9 +35,9 @@ function parseResponse(response, connection) {
         auth.token = response.data.authenticationToken;
         connection.send(auth.tokenAuth());
     }
-    else if (response.messageType == "AuthenticationResponse" && response.data.authenticated == true) {
+    /*else if (response.messageType == "AuthenticationResponse" && response.data.authenticated == true) {
         powerup(0);
-    }
+    }*/
 }
 
 /* TODO:
@@ -98,95 +98,70 @@ class MoveResizeRotate {
     }
 }
 
-function powerup(level) {
-    switch (level) {
-        case 0:
-            smallMario();
-            break;
-        case 1:
-            bigMario();
-            break;
-        case 2:
-            fireMario();
-            break;
-        default:
-            break;
+function runHotkey(hotkeyId) {
+    let data = {
+        "hotkeyID": hotkeyId
     }
+    let request = utils.buildRequest("HotkeyTriggerRequest", data);
+    vtsConnection.send(request);
 }
 
-function smallMario() {
-    let color = new Colors(255, 255, 255, 255);
-    let target = hairColor.concat(eyeColor);
-    recolorMesh(color, target, false, false);
-    let request = new MoveResizeRotate(0, false);
-    request.resize(-88);
-    request.move(0.18, -0.58)
-    request.send();
-    //resize(-98);
-    //reposition(0.18, -0.58, false);
-}
-
-function bigMario() {
-    let color = new Colors(255, 255, 255, 255);
-    let target = hairColor.concat(eyeColor);
-    recolorMesh(color, target, false, false);
-    let request = new MoveResizeRotate(0, false);
-    request.resize(-85);
-    request.move(0.18, -0.30);
-    request.send();
-    //resize(-95);
-    //reposition(0.18, -0.28, false);
-}
-
-function fireMario() {
-    let color = new Colors(255, 185, 185, 255);
-    let target = hairColor.concat(eyeColor);
-    recolorMesh(color, target);
-}
-
-function starMario(starActive) {
-    //TODO: handle what happens when getting a powerup while invincible
-    if (starActive == true) {
-        let color = new Colors(255, 255, 255, 255);
-        let target = hairColor.concat(eyeColor);
-        recolorMesh(color, target, true, true);
-    } else {
-        let color = new Colors(255, 255, 255, 255);
-        recolorMesh(color, null, false, true);
+function createParamValue(id, value, weight = null) {
+    let param = {
+        "id": id,
+        "value": value
     }
+    if (weight) param.weight = weight;
+    return param;
 }
 
-function jumpMario(jumpValue, marioSize) {
-    let request = new MoveResizeRotate(0.3, false);
-    let baseX = 0.18;
-    let baseY = -0.58;
-    let modifier = 0.05;
-    if (marioSize > 0) {
-        baseY = -0.30;
+class Avatar {
+    shockId = "2848d9924f1542098dc3a42316fca14b";
+    cryId = "19dfc88d28ec4902a18731bc90c40765";
+    shockAnimId = "1b1be728c25541f0b9c0d89a38c48dee";
+
+    shocked = false;
+    crying = false;
+    animating = false;
+    lossAnimation = false;
+    turnHead = 0;
+    turnBody = 0;
+
+    constructor() {
+        this.reset()
     }
-    if (jumpValue == true) {
-        request.move(baseX, baseY + modifier);
-    } else {
-        request.move(baseX, baseY);
+    reset() {
+        this.shock(false);
+        this.cry(false);
+        this.animating = false;
+        this.lossAnimation = false;
+        this.turnHead = 0;
+        this.turnBody = 0;
     }
-    request.send();
-}
-
-function swimMario() {
-    let color = new Colors(135, 135, 255, 255);
-    let target = hairColor;
-    recolorMesh(color, target, false, false);
-}
-
-function death() {
-    let deathJump = new MoveResizeRotate(0.4, true);
-    deathJump.move(0, 0.2);
-    deathJump.send();
-    setTimeout(function() {
-        let deathFall = new MoveResizeRotate(2, true);
-        deathFall.move(0, -2.20);
-        deathFall.send();
-    }, 450);
+    shock(bool) {
+        if (this.shocked != bool) {
+            this.shocked = bool;
+            vtsConnection.runHotkey(this.shockId);
+        }
+    }
+    cry(bool) {
+        if (this.crying != bool) {
+            this.crying = bool;
+            vtsConnection.runHotkey(this.cryId);
+        }
+    }
+    defeated() {
+        if (this.animating == false) {
+            this.animating = true;
+            vtsConnection.runHotkey(this.shockAnimId);
+            console.log("start animation flag");
+            setTimeout(2000, this.clearAnimation);
+        }
+    }
+    clearAnimation() {
+        console.log("animation flag cleared");
+        this.animating = false;
+    }
 }
 
 function connectToVts() {
@@ -195,10 +170,7 @@ function connectToVts() {
 
 module.exports = {
     connection: vtsConnection,
-    powerup: powerup,
-    star: starMario,
-    jump: jumpMario,
-    swim: swimMario,
-    death: death,
+    runHotkey: runHotkey,
+    Avatar: Avatar,
     connect: connectToVts
 };
