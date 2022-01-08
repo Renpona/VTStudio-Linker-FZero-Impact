@@ -30,11 +30,11 @@ wsClient.on('connect', function (connection) {
 });
 
 function parseResponse(response, connection) {
-    //console.log(response);
     if (!auth.token) {
         auth.token = response.data.authenticationToken;
         connection.send(auth.tokenAuth());
     }
+    //console.log(response.data);
     /*else if (response.messageType == "AuthenticationResponse" && response.data.authenticated == true) {
         powerup(0);
     }*/
@@ -116,12 +116,20 @@ function createParamValue(id, value, weight = null) {
 }
 
 class Avatar {
-    shockId = "2848d9924f1542098dc3a42316fca14b";
-    cryId = "19dfc88d28ec4902a18731bc90c40765";
-    shockAnimId = "1b1be728c25541f0b9c0d89a38c48dee";
+    //TODO: add to constructor, make them take passed values
+    shockId = "65ee6a7e5b094ff6a52cca162d418591";
+    cryId = "e68cbd4bdd8442c9ab12f0d70a45bce2";
+    shockAnimId = "edfb42d82e57468fa4e049d624175d61";
+    heartId = "20cab75892c644839fef92bacc3533f3";
+    angryId = "8ae1315c5b9047568b35b7c176e60868";
+
+    headTurnParam = "FaceAngleX";
+    bodyTurnParam = "FaceAngleZ";
 
     shocked = false;
     crying = false;
+    heartEyes = false;
+    angryMark = false;
     animating = false;
     lossAnimation = false;
     turnHead = 0;
@@ -130,9 +138,31 @@ class Avatar {
     constructor() {
         this.reset()
     }
+    turn(percentage) {
+        if (Math.abs(percentage) > 1) {
+            this.turnHead = Math.sign(percentage) * 30;
+            this.turnBody = (percentage - Math.sign(percentage)) * 120;
+        } else {
+            this.turnHead = percentage * 30;
+            this.turnBody = 0;
+        }
+        
+        //TODO: do this better
+        let paramArray = [];
+        paramArray.push(createParamValue(this.headTurnParam, this.turnHead, 0.8));
+        
+        //don't send body move requests if they're not needed, hand things back to the tracker
+        if (Math.abs(this.turnBody) > 0) {
+            paramArray.push(createParamValue(this.bodyTurnParam, this.turnBody, 0.7));
+        }
+        let request = utils.buildRequest("InjectParameterDataRequest", {"parameterValues": paramArray});
+        vtsConnection.send(request);
+    }
     reset() {
         this.shock(false);
         this.cry(false);
+        this.heartEyes;
+        this.angryMark;
         this.animating = false;
         this.lossAnimation = false;
         this.turnHead = 0;
@@ -141,27 +171,49 @@ class Avatar {
     shock(bool) {
         if (this.shocked != bool) {
             this.shocked = bool;
-            vtsConnection.runHotkey(this.shockId);
+            runHotkey(this.shockId);
         }
     }
     cry(bool) {
         if (this.crying != bool) {
             this.crying = bool;
-            vtsConnection.runHotkey(this.cryId);
+            runHotkey(this.cryId);
         }
+    }
+    happy() {
+        console.log("happy");
+        if (this.heartEyes == false && this.angryMark == false) {
+            console.log("happy check passed");
+            this.heartEyes = true;
+            runHotkey(this.heartId);
+            setTimeout(this.clearExpression, 1000, this, this.heartId, "heartEyes");
+        }
+    }
+    angry() {
+        if (this.heartEyes == false && this.angryMark == false) {
+            this.angryMark = true;
+            runHotkey(this.angryId);
+            setTimeout(this.clearExpression, 1000, this, this.angryId, "angryMark");
+        }
+    }
+    clearExpression(avatar, hotkey, flag) {
+        console.log("clear expression");
+        avatar[flag] = false;
+        runHotkey(hotkey);
     }
     defeated() {
         if (this.animating == false) {
             this.animating = true;
-            vtsConnection.runHotkey(this.shockAnimId);
+            runHotkey(this.shockAnimId);
             console.log("start animation flag");
-            setTimeout(2000, this.clearAnimation);
+            setTimeout(clearAnimation, 2000, this);
         }
     }
-    clearAnimation() {
-        console.log("animation flag cleared");
-        this.animating = false;
-    }
+}
+
+function clearAnimation(target) {
+    console.log("animation flag cleared");
+    target.animating = false;
 }
 
 function connectToVts() {

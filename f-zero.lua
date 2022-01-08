@@ -18,6 +18,9 @@ addState = 0x0000C3
 -- Timer, centiseconds
 addTimerCs = 0x0000C2
 
+-- Player rank in race
+addRank = 0x000DC8
+
 local function sendData(data)
 	packet = json.encode(data)
 	comm.socketServerSend(packet)
@@ -33,7 +36,7 @@ function intToBool(value)
 end
 
 function updateSpeed()
-    return memory.readbyte(addSpeed)
+    return memory.read_s16_le(addSpeed)
 end
 
 function updateTurn()
@@ -41,7 +44,7 @@ function updateTurn()
 end
 
 function updatePower()
-    return memory.readbyte(addPower)
+    return memory.read_s16_le(addPower)
 end
 
 function updateState()
@@ -53,13 +56,18 @@ function updateTimer()
     return memory.readbyte(addTimerCs)
 end
 
+function updateRank()
+    return memory.readbyte(addRank)
+end
+
 function updateVelocity()
     local speedVal = updateSpeed()
     local turnVal = updateTurn()
     local powerVal = updatePower()
     local stateVal = updateState()
     local timerVal = updateTimer()
-    local packet = {speed=speedVal, turn=turnVal, power=powerVal, state=stateVal, timer=timerVal}
+    local rankVal = updateRank()
+    local packet = {speed=speedVal, turn=turnVal, power=powerVal, state=stateVal, timer=timerVal, rank=rankVal}
     sendData(packet)
 end
 

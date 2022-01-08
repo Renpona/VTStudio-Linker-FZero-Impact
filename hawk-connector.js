@@ -7,6 +7,7 @@ var gameState = {
     "timer": 0,
     "speed": 0,
     "turn": 0,
+    "rank": 1,
     "power": 2048,
     "death": false,
     "damage": false,
@@ -64,25 +65,28 @@ function executeData(data) {
     }
 
     // determine whether race is active
-    if (data.timer != gameState.timer) {
+    if (data.timer == gameState.timer) {
         gameState.raceActive = false;
         gameState = data;
         return;
     }
     else {
+        //akari.reset();
         gameState.raceActive = true;
     }
 
     // determine whether the vehicle's taken damage
     if (data.damage != gameState.damage) {
-        console.log("switchDamage " + data.damage);
+        //console.log("switchDamage " + data.damage);
         akari.shock(data.damage);
     }
     
     // determine whether power is below half
-    if (akari.crying == false && power < 1024) {
+    if (akari.crying == false && data.power < 1024) {
+        console.log("akari start crying");
         akari.cry(true);
-    } else if (akari.crying == true && power >= 1024) {
+    } else if (akari.crying == true && data.power >= 1024) {
+        console.log("akari end crying");
         akari.cry(false);
     }
 
@@ -90,6 +94,18 @@ function executeData(data) {
     if (data.state == 0b01000000 || data.state == 0b01000000 || data.state == 0b11000000) {
         akari.defeated();
     }
+
+    if (data.rank < gameState.rank) {
+        //player gained a rank
+        console.log("rank up");
+        akari.happy();
+    } else if (data.rank > gameState.rank) {
+        //player lost a rank
+        console.log("rank down");
+        akari.angry();
+    }
+
+    akari.turn(data.turn);
 
     gameState = data;
 }
@@ -99,10 +115,9 @@ function convertTurnValue(turnValue) {
     if (turnValue == 0) {
         turnPercent = 0;
     } else {
-        let sign = Math.sign(turnValue);
-        let absValue = Math.abs(turnValue);
-        let turnPercent = absValue / normalTurnLimit;
-        if (sign < 1) turnPercent = -(turnPercent);
+        if (turnValue > 128) turnValue = turnValue - 256;
+        turnPercent = turnValue / normalTurnLimit;
     }
+    if (turnPercent > 1.2) turnPercent = 0;
     return turnPercent;
 }
